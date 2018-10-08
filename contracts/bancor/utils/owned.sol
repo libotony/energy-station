@@ -31,7 +31,7 @@ contract Owned is IOwned {
         @param _newOwner    new contract owner
     */
     function transferOwnership(address _newOwner) public ownerOnly {
-        require(_newOwner != owner);
+        require(_newOwner != owner, "can't transfer to current owner");
         newOwner = _newOwner;
     }
 
@@ -39,7 +39,7 @@ contract Owned is IOwned {
         @dev used by a new owner to accept an ownership transfer
     */
     function acceptOwnership() public {
-        require(msg.sender == newOwner);
+        require(msg.sender == newOwner, "sender must be the new owner");
         emit OwnerUpdate(owner, newOwner);
         owner = newOwner;
         newOwner = address(0);
