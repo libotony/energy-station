@@ -24,7 +24,7 @@ contract VIP180Token is IVIP180Token, Utils {
         @param _symbol      token symbol
         @param _decimals    decimal points, for display purposes
     */
-    function VIP180Token(string _name, string _symbol, uint8 _decimals) public {
+    constructor(string _name, string _symbol, uint8 _decimals) public {
         require(bytes(_name).length > 0 && bytes(_symbol).length > 0); // validate input
 
         name = _name;

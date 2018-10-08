@@ -18,7 +18,7 @@ contract VETToken is IVETToken, Owned, VIP180Token, TokenHolder {
     /**
         @dev constructor
     */
-    function VETToken()
+    constructor()
         public
         VIP180Token("VET Token", "VET", 18) {
     }
