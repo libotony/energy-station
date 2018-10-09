@@ -85,7 +85,11 @@ contract EnergyStation is TokenHolder{
 
         @param _minReturn   if the conversion results in an amount smaller than the minimum return - it is cancelled, must be nonzero
     */
-    function convertForVET(uint256 _amount, uint256 _minReturn) public returns (uint256) {
+    function convertForVET(uint256 _amount, uint256 _minReturn) 
+        public 
+        conversionsAllowed
+        returns (uint256) 
+    {
         require(IVIP180Token(energyToken).allowance(msg.sender, this) >= _amount, "Must have set allowance for this contract");
 
         uint256 sellAmount = _amount;
@@ -119,11 +123,16 @@ contract EnergyStation is TokenHolder{
 
         @param _minReturn   if the conversion results in an amount smaller than the minimum return - it is cancelled, must be nonzero
     */
-    function convertForEnergy(uint256 _minReturn) public payable returns (uint256) {
+    function convertForEnergy(uint256 _minReturn) 
+        public 
+        payable 
+        conversionsAllowed 
+        returns (uint256) 
+    {
         require(msg.value > 0, "Must have vet sent for conversion");
 
         // convert VET to VET Token
-        IVETToken(vetToken).deposit.value(msg.value);
+        IVETToken(vetToken).deposit.value(msg.value)();
 
         uint256 sellAmount = msg.value;
         uint256 fromConnectorBalance = IVETToken(vetToken).balanceOf(this);
@@ -149,4 +158,15 @@ contract EnergyStation is TokenHolder{
         return amount;
     }
 
+    /**
+        deposit vet into this
+    */
+    function() 
+        public 
+        payable 
+    {
+         require(msg.value > 0, "Must have vet sent");
+         // convert VET to VET Token
+        IVETToken(vetToken).deposit.value(msg.value)();
+    }
 }
