@@ -1,7 +1,7 @@
 pragma solidity ^0.4.24;
 import "./vip180-token.sol";
 import "../interfaces/vet-token.sol";
-import "../utils/owned.sol";
+import "../../thor-builtin/master-owned.sol";
 import "../utils/token-holder.sol";
 
 /**

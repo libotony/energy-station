@@ -1,5 +1,5 @@
 pragma solidity ^0.4.24;
-import "./owned.sol";
+import "../../thor-builtin/master-owned.sol";
 import "./utils.sol";
 import "../interfaces/token-holder.sol";
 import "../interfaces/vip180-token.sol";

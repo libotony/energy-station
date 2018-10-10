@@ -3,6 +3,7 @@ import "./bancor/utils/token-holder.sol";
 import "./bancor/interfaces/bancor-formula.sol";
 import "./bancor/interfaces/vet-token.sol";
 import "./bancor/interfaces/vip180-token.sol";
+import "./thor-builtin/protoed.sol";
 
 /*
     Energy Station 
@@ -13,7 +14,7 @@ import "./bancor/interfaces/vip180-token.sol";
     Open issues:
         - Front-running attacks: no need dealing with this now since no user now, let the gas price(or the proposer decide the execution order),will upgrade if it's necessary
  */
-contract EnergyStation is TokenHolder{
+contract EnergyStation is TokenHolder, Protoed{
     uint64 private constant MAX_CONVERSION_FEE = 1000000;
 
     address public bancorFormula;                               // address of bancor formula contract
