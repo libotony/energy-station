@@ -14,11 +14,14 @@ import "./bancor/interfaces/vip180-token.sol";
         - Front-running attacks: no need dealing with this now since no user now, let the gas price(or the proposer decide the execution order),will upgrade if it's necessary
  */
 contract EnergyStation is TokenHolder{
+    uint64 private constant MAX_CONVERSION_FEE = 1000000;
+
     address public bancorFormula;                               // address of bancor formula contract
     address public vetToken;                                    // address of VET token
     address public energyToken = address(bytes6("Energy"));     // address of Energy token
     bool public conversionsEnabled = false;                     // true if token conversions is enabled, false if not
     uint32 public relayTokenWeight;                             // relay token connector weight, represented in ppm, 1-1000000, in EnergyStation weight is fixed to 500000(0.5)
+    uint32 public conversionFee = 0;                            // current conversion fee, represented in ppm, 0...maxConversionFee
     
     /**
         Constructor
@@ -40,8 +43,10 @@ contract EnergyStation is TokenHolder{
         address indexed _trader,
         uint256 _sellAmount,
         uint256 _return,
-        int256 _conversionFee
+        uint256 _conversionFee
     );
+    // triggered when the conversion fee is updated
+    event ConversionFeeUpdate(uint32 _prevFee, uint32 _newFee);
 
     /** 
         Set bancor formula address
@@ -70,6 +75,21 @@ contract EnergyStation is TokenHolder{
     }
 
     /**
+        updates the current conversion fee
+        can only be called by the owner
+
+        @param _conversionFee new conversion fee, represented in ppm
+    */
+    function setConversionFee(uint32 _conversionFee)
+        public
+        ownerOnly
+    {
+        require(_conversionFee >= 0 && _conversionFee < MAX_CONVERSION_FEE, "Invalid conversion fee");
+        emit ConversionFeeUpdate(conversionFee, _conversionFee);
+        conversionFee = _conversionFee;
+    }
+
+    /**
         disables the entire conversion functionality
         this is a safety mechanism in case of a emergency
         can only be called by the manager
@@ -83,7 +103,9 @@ contract EnergyStation is TokenHolder{
     /**
         Convert Energy to VET
 
+        @param _amount      amount to convert, in energy
         @param _minReturn   if the conversion results in an amount smaller than the minimum return - it is cancelled, must be nonzero
+        @return converted amount
     */
     function convertForVET(uint256 _amount, uint256 _minReturn) 
         public 
@@ -98,12 +120,11 @@ contract EnergyStation is TokenHolder{
 
         uint256 amount = IBancorFormula(bancorFormula).calculateCrossConnectorReturn(fromConnectorBalance, relayTokenWeight, toConnectorBalance, relayTokenWeight, sellAmount);
 
-        // TODO: get final amount (amount minus conversion fee)
-        uint256 feeAmount = 0;
-        uint256 finalAmount = amount - feeAmount;
+        uint256 finalAmount = getFinalAmount(amount);
+        uint256 feeAmount = amount - finalAmount;
 
         // ensure the trade gives something in return and meets the minimum requested amount
-        require(finalAmount != 0 && finalAmount >= _minReturn, "Invalid amount after bancor formula");
+        require(finalAmount != 0 && finalAmount >= _minReturn, "Invalid converted amount");
 
         require(finalAmount < toConnectorBalance, "Converted amount must be lower than the balance of this");
 
@@ -113,8 +134,7 @@ contract EnergyStation is TokenHolder{
         // transfer funds to the caller in vet
         IVETToken(vetToken).withdrawTo(msg.sender, finalAmount);
         
-        // TODO: uint256 -> int256
-        emit Conversion(energyToken, vetToken, msg.sender, sellAmount, finalAmount, int256(feeAmount));
+        emit Conversion(energyToken, vetToken, msg.sender, sellAmount, finalAmount, feeAmount);
         return amount;
     }
 
@@ -122,6 +142,7 @@ contract EnergyStation is TokenHolder{
         Convert VET to Energy
 
         @param _minReturn   if the conversion results in an amount smaller than the minimum return - it is cancelled, must be nonzero
+        @return converted amount
     */
     function convertForEnergy(uint256 _minReturn) 
         public 
@@ -140,12 +161,11 @@ contract EnergyStation is TokenHolder{
 
         uint256 amount = IBancorFormula(bancorFormula).calculateCrossConnectorReturn(fromConnectorBalance, relayTokenWeight, toConnectorBalance, relayTokenWeight, sellAmount);
 
-        // TODO: get final amount (amount minus conversion fee)
-        uint256 feeAmount = 0;
-        uint256 finalAmount = amount - feeAmount;
+        uint256 finalAmount = getFinalAmount(amount);
+        uint256 feeAmount = amount - finalAmount;
 
         // ensure the trade gives something in return and meets the minimum requested amount
-        require(finalAmount != 0 && finalAmount >= _minReturn, "Invalid amount after bancor formula");
+        require(finalAmount != 0 && finalAmount >= _minReturn, "Invalid converted amount");
 
         require(finalAmount < toConnectorBalance, "Converted amount must be lower than the balance of this");
 
@@ -154,8 +174,65 @@ contract EnergyStation is TokenHolder{
         require(IVIP180Token(energyToken).transfer(msg.sender, finalAmount), "Transfer energy failed");
 
         // TODO: uint256 -> int256
-        emit Conversion(energyToken, vetToken, msg.sender, sellAmount, finalAmount, int256(feeAmount));
+        emit Conversion(energyToken, vetToken, msg.sender, sellAmount, finalAmount, feeAmount);
         return amount;
+    }
+
+    /**
+        get the returned energy amount that can be converted by the given VET
+
+        @param _amount      amount to convert, in vet
+        @return converted amount
+     */
+    function getEnergyReturn(uint256 _amount) 
+        public 
+        view 
+        returns(uint256)
+    {
+        uint256 sellAmount = _amount;
+        uint256 fromConnectorBalance = IVETToken(vetToken).balanceOf(this);
+        uint256 toConnectorBalance = IVIP180Token(energyToken).balanceOf(this);
+
+        uint256 amount = IBancorFormula(bancorFormula).calculateCrossConnectorReturn(fromConnectorBalance, relayTokenWeight, toConnectorBalance, relayTokenWeight, sellAmount);
+
+        uint256 finalAmount = getFinalAmount(amount);
+
+        require(finalAmount < toConnectorBalance, "Converted amount must be lower than the balance of this");
+        return finalAmount;
+    }
+
+    /**
+        get the returned vet amount that can be converted by the given energy
+
+        @param _amount      amount to convert, in vet
+        @return converted amount
+     */
+    function getVETReturn(uint256 _amount) 
+        public 
+        view 
+        returns(uint256)
+    {
+        uint256 sellAmount = _amount;
+        uint256 fromConnectorBalance = IVIP180Token(energyToken).balanceOf(this);
+        uint256 toConnectorBalance = IVETToken(vetToken).balanceOf(this);
+
+        uint256 amount = IBancorFormula(bancorFormula).calculateCrossConnectorReturn(fromConnectorBalance, relayTokenWeight, toConnectorBalance, relayTokenWeight, sellAmount);
+
+        uint256 finalAmount = getFinalAmount(amount);
+
+        require(finalAmount < toConnectorBalance, "Converted amount must be lower than the balance of this");
+        return finalAmount;
+    }
+
+    /**
+        given a return amount, returns the amount minus the conversion fee
+
+        @param _amount      return amount
+
+        @return return amount minus conversion fee
+    */
+    function getFinalAmount(uint256 _amount) public view returns (uint256) {
+        return safeMul(_amount, MAX_CONVERSION_FEE - conversionFee) / MAX_CONVERSION_FEE;
     }
 
     /**
