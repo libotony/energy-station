@@ -37,3 +37,18 @@ The Bancor Protocol enables automatic price determination and an autonomous liqu
 
 ## Deployment
 
+1. Deploy 'EnergyStation', 'VETToken', 'BancorFormula'
+2. `EnergyStation.setVETToken(VETToken address)`
+3. `EnergyStation.setFormula(BancorFormula address)`
+4. `EnergyStation.setConversionFee(conversionFee in ppm)` 
+5. Send VET to `EnergyStation`
+6. Send VTHO to `EnergyStation`
+7. Enable conversion by `EnergyStation.disableConversions(false)` 
+
+The amount of VET and VTHO sent to `EnergyStation` will be the initial supply of two connector token.
+
+## Usage
+
+1. Simulate `EnergyStation.getEnergyReturn(amount)` or `EnergyStation.getVETReturn(amount)` to get converted value and multiply by 0.99 as minimum return
+2. Convert VET to VTHO: `EnergyStation.convertForVET(minReturn)` 
+2. Convert VTHO to VET: `Energy.approve(EnergyStation, amount)` and `EnergyStation.convertForEnergy(amount,minReturn)` 

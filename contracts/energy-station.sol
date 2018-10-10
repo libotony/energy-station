@@ -174,7 +174,6 @@ contract EnergyStation is TokenHolder, Protoed{
         // the transfer might fail if the actual connector balance is smaller than the virtual balance
         require(IVIP180Token(energyToken).transfer(msg.sender, finalAmount), "Transfer energy failed");
 
-        // TODO: uint256 -> int256
         emit Conversion(energyToken, vetToken, msg.sender, sellAmount, finalAmount, feeAmount);
         return amount;
     }
