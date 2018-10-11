@@ -153,9 +153,6 @@ contract EnergyStation is TokenHolder, Protoed{
     {
         require(msg.value > 0, "Must have vet sent for conversion");
 
-        // convert VET to VET Token
-        IVETToken(vetToken).deposit.value(msg.value)();
-
         uint256 sellAmount = msg.value;
         uint256 fromConnectorBalance = IVETToken(vetToken).balanceOf(this);
         uint256 toConnectorBalance = IVIP180Token(energyToken).balanceOf(this);
@@ -170,6 +167,10 @@ contract EnergyStation is TokenHolder, Protoed{
 
         require(finalAmount < toConnectorBalance, "Converted amount must be lower than the balance of this");
 
+        // transfer the VET from the caller
+        // convert VET to VET Token
+        IVETToken(vetToken).deposit.value(msg.value)();
+        
         // transfer funds to the caller in the to connector token
         // the transfer might fail if the actual connector balance is smaller than the virtual balance
         require(IVIP180Token(energyToken).transfer(msg.sender, finalAmount), "Transfer energy failed");
