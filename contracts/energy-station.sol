@@ -190,10 +190,11 @@ contract EnergyStation is TokenHolder, Protoed{
         view 
         returns(uint256)
     {
+        require(_amount > 0, "Must have amount set for conversion");
+
         uint256 sellAmount = _amount;
         uint256 fromConnectorBalance = IVETToken(vetToken).balanceOf(this);
         uint256 toConnectorBalance = IVIP180Token(energyToken).balanceOf(this);
-
         uint256 amount = IBancorFormula(bancorFormula).calculateCrossConnectorReturn(fromConnectorBalance, relayTokenWeight, toConnectorBalance, relayTokenWeight, sellAmount);
 
         uint256 finalAmount = getFinalAmount(amount);
@@ -213,6 +214,8 @@ contract EnergyStation is TokenHolder, Protoed{
         view 
         returns(uint256)
     {
+        require(_amount > 0, "Must have amount set for conversion");
+
         uint256 sellAmount = _amount;
         uint256 fromConnectorBalance = IVIP180Token(energyToken).balanceOf(this);
         uint256 toConnectorBalance = IVETToken(vetToken).balanceOf(this);
