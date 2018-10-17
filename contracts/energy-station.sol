@@ -175,7 +175,7 @@ contract EnergyStation is TokenHolder, Protoed{
         // the transfer might fail if the actual connector balance is smaller than the virtual balance
         require(IVIP180Token(energyToken).transfer(msg.sender, finalAmount), "Transfer energy failed");
 
-        emit Conversion(energyToken, vetToken, msg.sender, sellAmount, finalAmount, feeAmount);
+        emit Conversion(vetToken, energyToken, msg.sender, sellAmount, finalAmount, feeAmount);
         return amount;
     }
 
@@ -188,7 +188,7 @@ contract EnergyStation is TokenHolder, Protoed{
     function getEnergyReturn(uint256 _amount) 
         public 
         view 
-        returns(uint256)
+        returns(uint256 canAcquire)
     {
         require(_amount > 0, "Must have amount set for conversion");
 
@@ -197,10 +197,9 @@ contract EnergyStation is TokenHolder, Protoed{
         uint256 toConnectorBalance = IVIP180Token(energyToken).balanceOf(this);
         uint256 amount = IBancorFormula(bancorFormula).calculateCrossConnectorReturn(fromConnectorBalance, relayTokenWeight, toConnectorBalance, relayTokenWeight, sellAmount);
 
-        uint256 finalAmount = getFinalAmount(amount);
+        canAcquire = getFinalAmount(amount);
 
-        require(finalAmount < toConnectorBalance, "Converted amount must be lower than the balance of this");
-        return finalAmount;
+        require(canAcquire < toConnectorBalance, "Converted amount must be lower than the balance of this");
     }
 
     /**
@@ -212,7 +211,7 @@ contract EnergyStation is TokenHolder, Protoed{
     function getVETReturn(uint256 _amount) 
         public 
         view 
-        returns(uint256)
+        returns(uint256 canAcquire)
     {
         require(_amount > 0, "Must have amount set for conversion");
 
@@ -222,10 +221,9 @@ contract EnergyStation is TokenHolder, Protoed{
 
         uint256 amount = IBancorFormula(bancorFormula).calculateCrossConnectorReturn(fromConnectorBalance, relayTokenWeight, toConnectorBalance, relayTokenWeight, sellAmount);
 
-        uint256 finalAmount = getFinalAmount(amount);
+        canAcquire = getFinalAmount(amount);
 
-        require(finalAmount < toConnectorBalance, "Converted amount must be lower than the balance of this");
-        return finalAmount;
+        require(canAcquire < toConnectorBalance, "Converted amount must be lower than the balance of this");
     }
 
     /**
