@@ -17,7 +17,7 @@
   },
   "homepage": "https://github.com/libotony/energy-station#readme",
   "devDependencies": {
-    "remixd": "^0.1.8-alpha.5",
+    "remixd": "^0.1.8-alpha.6",
     "truffle": "^4.1.14"
   }
 }
