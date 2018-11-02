@@ -9,25 +9,6 @@ contract Utils {
     */
     constructor() public {
     }
-
-    // verifies that an amount is greater than zero
-    modifier greaterThanZero(uint256 _amount) {
-        require(_amount > 0, "must be greater than zero");
-        _;
-    }
-
-    // validates an address - currently only checks that it isn't null
-    modifier validAddress(address _address) {
-        require(_address != address(0), "must be a valid address");
-        _;
-    }
-
-    // verifies that the address is different than this contract address
-    modifier notThis(address _address) {
-        require(_address != address(this), "must not be this");
-        _;
-    }
-
     // Overflow protected math functions
 
     /**
@@ -78,7 +59,7 @@ contract Utils {
 
         @return converted value
     */
-    function toUINT104(uint256 _x) internal pure returns(uint112) {
+    function toUINT104(uint256 _x) internal pure returns(uint104) {
         assert(uint104(_x) == _x);
         return uint104(_x);
     }
