@@ -1,5 +1,5 @@
 pragma solidity ^0.4.24;
-import "../bancor/interfaces/owned.sol";
+import "../interfaces/owned.sol";
 import "./builtin.sol";
 
 /*
