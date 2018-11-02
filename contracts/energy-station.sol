@@ -1,9 +1,8 @@
 pragma solidity ^0.4.24;
-import "./bancor/utils/token-holder.sol";
-import "./bancor/interfaces/bancor-formula.sol";
-import "./bancor/interfaces/vet-token.sol";
-import "./bancor/interfaces/vip180-token.sol";
 import "./thor-builtin/protoed.sol";
+import "./interfaces/vip180-token.sol";
+import "./utils.sol";
+import "./thor-builtin/master-owned.sol";
 
 /*
     Energy Station 
@@ -14,21 +13,19 @@ import "./thor-builtin/protoed.sol";
     Open issues:
         - Front-running attacks: no need dealing with this now since no user now, let the gas price(or the proposer decide the execution order),will upgrade if it's necessary
  */
-contract EnergyStation is TokenHolder, Protoed{
+contract EnergyStation is Utils, Owned, Protoed{
     uint64 private constant MAX_CONVERSION_FEE = 1000000;
 
-    address public bancorFormula;                               // address of bancor formula contract
-    address public vetToken;                                    // address of VET token
     address public energyToken = address(bytes6("Energy"));     // address of Energy token
-    bool public conversionsEnabled = false;                     // true if token conversions is enabled, false if not
-    uint32 public relayTokenWeight;                             // relay token connector weight, represented in ppm, 1-1000000, in EnergyStation weight is fixed to 500000(0.5)
     uint32 public conversionFee = 0;                            // current conversion fee, represented in ppm, 0...maxConversionFee
+    bool public conversionsEnabled = false;                     // true if token conversions is enabled, false if not
+    uint104 public vetVirtualBalance = 0;                       // virtual balance represents the current vet balance(uint104 represents 2e31 that is greater than 87b vet)
+    uint256 public energyVirtualBalance = 0;                    // virtual balance represents the current energy balance
     
     /**
         Constructor
     */
     constructor() public{
-        relayTokenWeight = 500000;
     }
 
     // allows execution only when conversions aren't disabled
@@ -39,8 +36,7 @@ contract EnergyStation is TokenHolder, Protoed{
 
     // triggered when a conversion between two tokens occurs
     event Conversion(
-        address indexed _fromToken,
-        address indexed _toToken,
+        int8 indexed tradeType,   // 0 - vet -> energy, 1- energy -> vet
         address indexed _trader,
         uint256 _sellAmount,
         uint256 _return,
@@ -48,32 +44,6 @@ contract EnergyStation is TokenHolder, Protoed{
     );
     // triggered when the conversion fee is updated
     event ConversionFeeUpdate(uint32 _prevFee, uint32 _newFee);
-
-    /** 
-        Set bancor formula address
-        @param _formula    address of a bancor formula contract
-    */
-    function setFormula(IBancorFormula _formula)
-        public
-        ownerOnly
-        validAddress(_formula)
-        notThis(_formula)
-    {
-        bancorFormula = _formula;
-    }
-
-    /** 
-        Set VET Token address
-        @param _vetToken    address of a vet token contract
-    */
-    function setVETToken(IVETToken _vetToken)
-        public
-        ownerOnly
-        validAddress(_vetToken)
-        notThis(_vetToken)
-    {
-        vetToken = _vetToken;
-    }
 
     /**
         updates the current conversion fee
@@ -91,35 +61,31 @@ contract EnergyStation is TokenHolder, Protoed{
     }
 
     /**
-        disables the entire conversion functionality
+        change the entire conversion status functionality
         this is a safety mechanism in case of a emergency
-        can only be called by the manager
+        can only be called by the owner
 
         @param _disable true to disable conversions, false to re-enable them
     */
-    function disableConversions(bool _disable) public ownerOnly {
-        conversionsEnabled = !_disable;
+    function changeConversionStatus(bool _enabled) public ownerOnly {
+        conversionsEnabled = _enabled;
     }
 
     /**
         Convert Energy to VET
 
-        @param _amount      amount to convert, in energy
+        @param _sellAmount      amount to convert, in energy
         @param _minReturn   if the conversion results in an amount smaller than the minimum return - it is cancelled, must be nonzero
         @return converted amount
     */
-    function convertForVET(uint256 _amount, uint256 _minReturn) 
+    function convertForVET(uint256 _sellAmount, uint256 _minReturn) 
         public 
         conversionsAllowed
         returns (uint256) 
     {
-        require(IVIP180Token(energyToken).allowance(msg.sender, this) >= _amount, "Must have set allowance for this contract");
+        require(IVIP180Token(energyToken).allowance(msg.sender, this) >= _sellAmount, "Must have set allowance for this contract");
 
-        uint256 sellAmount = _amount;
-        uint256 fromConnectorBalance = IVIP180Token(energyToken).balanceOf(this);
-        uint256 toConnectorBalance = IVETToken(vetToken).balanceOf(this);
-
-        uint256 amount = IBancorFormula(bancorFormula).calculateCrossConnectorReturn(fromConnectorBalance, relayTokenWeight, toConnectorBalance, relayTokenWeight, sellAmount);
+        uint256 amount = calculateCrossConnectorReturn(energyVirtualBalance, vetVirtualBalance, _sellAmount);
 
         uint256 finalAmount = getFinalAmount(amount);
         uint256 feeAmount = amount - finalAmount;
@@ -127,15 +93,15 @@ contract EnergyStation is TokenHolder, Protoed{
         // ensure the trade gives something in return and meets the minimum requested amount
         require(finalAmount != 0 && finalAmount >= _minReturn, "Invalid converted amount");
 
-        require(finalAmount < toConnectorBalance, "Converted amount must be lower than the balance of this");
+        require(finalAmount < vetVirtualBalance, "Converted amount must be lower than the balance of this");
 
         // transfer funds from the caller in the from connector token
-        require(IVIP180Token(energyToken).transferFrom(msg.sender, this, sellAmount), "Transfer energy failed");
+        require(IVIP180Token(energyToken).transferFrom(msg.sender, this, _sellAmount), "Transfer energy failed");
 
         // transfer funds to the caller in vet
-        IVETToken(vetToken).withdrawTo(msg.sender, finalAmount);
+        msg.sender.transfer(finalAmount);
         
-        emit Conversion(energyToken, vetToken, msg.sender, sellAmount, finalAmount, feeAmount);
+        emit Conversion(1, msg.sender, _sellAmount, finalAmount, feeAmount);
         return amount;
     }
 
@@ -153,11 +119,10 @@ contract EnergyStation is TokenHolder, Protoed{
     {
         require(msg.value > 0, "Must have vet sent for conversion");
 
-        uint256 sellAmount = msg.value;
-        uint256 fromConnectorBalance = IVETToken(vetToken).balanceOf(this);
+        uint256 _sellAmount = msg.value;
         uint256 toConnectorBalance = IVIP180Token(energyToken).balanceOf(this);
 
-        uint256 amount = IBancorFormula(bancorFormula).calculateCrossConnectorReturn(fromConnectorBalance, relayTokenWeight, toConnectorBalance, relayTokenWeight, sellAmount);
+        uint256 amount = calculateCrossConnectorReturn(vetVirtualBalance, energyVirtualBalance, _sellAmount);
 
         uint256 finalAmount = getFinalAmount(amount);
         uint256 feeAmount = amount - finalAmount;
@@ -166,64 +131,51 @@ contract EnergyStation is TokenHolder, Protoed{
         require(finalAmount != 0 && finalAmount >= _minReturn, "Invalid converted amount");
 
         require(finalAmount < toConnectorBalance, "Converted amount must be lower than the balance of this");
-
-        // transfer the VET from the caller
-        // convert VET to VET Token
-        IVETToken(vetToken).deposit.value(msg.value)();
         
         // transfer funds to the caller in the to connector token
         // the transfer might fail if the actual connector balance is smaller than the virtual balance
         require(IVIP180Token(energyToken).transfer(msg.sender, finalAmount), "Transfer energy failed");
 
-        emit Conversion(vetToken, energyToken, msg.sender, sellAmount, finalAmount, feeAmount);
+        emit Conversion(0, msg.sender, _sellAmount, finalAmount, feeAmount);
         return amount;
     }
 
     /**
         get the returned energy amount that can be converted by the given VET
 
-        @param _amount      amount to convert, in vet
+        @param _sellAmount      amount to convert, in vet
         @return converted amount
      */
-    function getEnergyReturn(uint256 _amount) 
+    function getEnergyReturn(uint256 _sellAmount) 
         public 
         view 
         returns(uint256 canAcquire)
     {
-        require(_amount > 0, "Must have amount set for conversion");
+        require(_sellAmount > 0, "Must have amount set for conversion");
 
-        uint256 sellAmount = _amount;
-        uint256 fromConnectorBalance = IVETToken(vetToken).balanceOf(this);
-        uint256 toConnectorBalance = IVIP180Token(energyToken).balanceOf(this);
-        uint256 amount = IBancorFormula(bancorFormula).calculateCrossConnectorReturn(fromConnectorBalance, relayTokenWeight, toConnectorBalance, relayTokenWeight, sellAmount);
-
+        uint256 amount = calculateCrossConnectorReturn(vetVirtualBalance, energyVirtualBalance, _sellAmount);
         canAcquire = getFinalAmount(amount);
 
-        require(canAcquire < toConnectorBalance, "Converted amount must be lower than the balance of this");
+        require(canAcquire < energyVirtualBalance, "Converted amount must be lower than the balance of this");
     }
 
     /**
         get the returned vet amount that can be converted by the given energy
 
-        @param _amount      amount to convert, in vet
+        @param _sellAmount      amount to convert, in vet
         @return converted amount
      */
-    function getVETReturn(uint256 _amount) 
+    function getVETReturn(uint256 _sellAmount) 
         public 
         view 
         returns(uint256 canAcquire)
     {
-        require(_amount > 0, "Must have amount set for conversion");
+        require(_sellAmount > 0, "Must have amount set for conversion");
 
-        uint256 sellAmount = _amount;
-        uint256 fromConnectorBalance = IVIP180Token(energyToken).balanceOf(this);
-        uint256 toConnectorBalance = IVETToken(vetToken).balanceOf(this);
-
-        uint256 amount = IBancorFormula(bancorFormula).calculateCrossConnectorReturn(fromConnectorBalance, relayTokenWeight, toConnectorBalance, relayTokenWeight, sellAmount);
-
+        uint256 amount = calculateCrossConnectorReturn(energyVirtualBalance, vetVirtualBalance, _sellAmount);
         canAcquire = getFinalAmount(amount);
 
-        require(canAcquire < toConnectorBalance, "Converted amount must be lower than the balance of this");
+        require(canAcquire < vetVirtualBalance, "Converted amount must be lower than the balance of this");
     }
 
     /**
@@ -238,14 +190,25 @@ contract EnergyStation is TokenHolder, Protoed{
     }
 
     /**
-        deposit vet into this
+        From Bancor at tag v0.4.2
+        given two connector balances(both weight are 0.5 for this case) and a sell amount (in the first connector token),
+        calculates the return for a conversion from the first connector token to the second connector token (in the second connector token)
+
+        Original Formula:
+        Return = _toConnectorBalance * (1 - (_fromConnectorBalance / (_fromConnectorBalance + _amount)) ^ (_fromConnectorWeight / _toConnectorWeight))
+
+        Simplified Formula:
+        Return = _toConnectorBalance * (1 - (_fromConnectorBalance / (_fromConnectorBalance + _amount)))
+
+        @param _fromConnectorBalance    input connector balance
+        @param _toConnectorBalance      output connector balance
+        @param _amount                  input connector amount
+
+        @return second connector amount
     */
-    function() 
-        public 
-        payable 
-    {
-         require(msg.value > 0, "Must have vet sent");
-         // convert VET to VET Token
-        IVETToken(vetToken).deposit.value(msg.value)();
+    function calculateCrossConnectorReturn(uint256 _fromConnectorBalance, uint256 _toConnectorBalance, uint256 _amount) private pure returns (uint256) {
+        // validate input
+        require(_fromConnectorBalance > 0 && _toConnectorBalance > 0);
+        return safeMul(_toConnectorBalance, _amount) / safeAdd(_fromConnectorBalance, _amount);
     }
 }

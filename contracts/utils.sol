@@ -70,4 +70,16 @@ contract Utils {
         assert(_x == 0 || z / _x == _y);
         return z;
     }
+
+    /**
+        @dev convert to uint104, asserts if the conversion overflows
+
+        @param _x   value
+
+        @return converted value
+    */
+    function toUINT104(uint256 _x) internal pure returns(uint112) {
+        assert(uint104(_x) == _x);
+        return uint104(_x);
+    }
 }
