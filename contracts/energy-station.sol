@@ -46,6 +46,55 @@ contract EnergyStation is Utils, Owned, Protoed{
     event ConversionFeeUpdate(uint32 _prevFee, uint32 _newFee);
 
     /**
+        add vet to this, this action will change the conversion price
+     */
+    function fillVET()
+        public
+        ownerOnly
+        payable
+    {
+        require(msg.value > 0, "Must have vet sent");
+        vetVirtualBalance = toUINT104(safeAdd(vetVirtualBalance, msg.value));
+    }
+
+    /**
+        add energy to this, this action will change the conversion price
+     */
+    function fillEnergy(uint256 _amount)
+        public
+        ownerOnly
+    {
+        require(IVIP180Token(energyToken).allowance(msg.sender, this) >= _amount, "Must have set allowance for this contract");
+        require(IVIP180Token(energyToken).transferFrom(msg.sender, this, _amount), "Transfer energy failed");
+        energyVirtualBalance = toUINT104(safeAdd(energyVirtualBalance, _amount));
+    }
+
+    /**
+        withdraw conversion fee
+     */
+    function withdrawProfit()
+        public
+        ownerOnly
+    {
+        uint256 energyBalance = IVIP180Token(energyToken).balanceOf(this);
+        require( energyBalance >= energyVirtualBalance, "fatal: energy balance lower than virtual balance");
+        require(address(this).balance >= vetVirtualBalance, "fatal: vet balance lower than virtual balance");
+
+        require(IVIP180Token(energyToken).transfer(msg.sender, safeSub(energyBalance, energyVirtualBalance)),"transfer energy failed");
+        msg.sender.transfer(safeSub(address(this).balance, vetVirtualBalance));
+    }
+
+    /**
+        close the whole market(destroy the contract) and withdraw vet and energy to msg.sender
+     */
+    function closeMarket()
+        public
+        ownerOnly
+    {
+        selfdestruct(msg.sender);
+    }
+
+    /**
         updates the current conversion fee
         can only be called by the owner
 
@@ -65,7 +114,7 @@ contract EnergyStation is Utils, Owned, Protoed{
         this is a safety mechanism in case of a emergency
         can only be called by the owner
 
-        @param _disable true to disable conversions, false to re-enable them
+        @param _enabled false to disable conversions, true to enable them
     */
     function changeConversionStatus(bool _enabled) public ownerOnly {
         conversionsEnabled = _enabled;
@@ -92,14 +141,16 @@ contract EnergyStation is Utils, Owned, Protoed{
 
         // ensure the trade gives something in return and meets the minimum requested amount
         require(finalAmount != 0 && finalAmount >= _minReturn, "Invalid converted amount");
-
         require(finalAmount < vetVirtualBalance, "Converted amount must be lower than the balance of this");
 
         // transfer funds from the caller in the from connector token
         require(IVIP180Token(energyToken).transferFrom(msg.sender, this, _sellAmount), "Transfer energy failed");
-
         // transfer funds to the caller in vet
         msg.sender.transfer(finalAmount);
+
+        // update virtualBalance
+        energyVirtualBalance = safeAdd(energyVirtualBalance, _sellAmount);
+        vetVirtualBalance = toUINT104(safeSub(vetVirtualBalance, amount));
         
         emit Conversion(1, msg.sender, _sellAmount, finalAmount, feeAmount);
         return amount;
@@ -129,12 +180,14 @@ contract EnergyStation is Utils, Owned, Protoed{
 
         // ensure the trade gives something in return and meets the minimum requested amount
         require(finalAmount != 0 && finalAmount >= _minReturn, "Invalid converted amount");
-
         require(finalAmount < toConnectorBalance, "Converted amount must be lower than the balance of this");
         
         // transfer funds to the caller in the to connector token
         // the transfer might fail if the actual connector balance is smaller than the virtual balance
         require(IVIP180Token(energyToken).transfer(msg.sender, finalAmount), "Transfer energy failed");
+
+        vetVirtualBalance = toUINT104(safeAdd(vetVirtualBalance, _sellAmount));
+        energyVirtualBalance = safeAdd(energyVirtualBalance, amount);
 
         emit Conversion(0, msg.sender, _sellAmount, finalAmount, feeAmount);
         return amount;
