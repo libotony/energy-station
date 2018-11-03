@@ -132,7 +132,7 @@ contract EnergyStation is Utils, Owned, Protoed{
         conversionsAllowed
         returns (uint256) 
     {
-        require(IVIP180Token(energyToken).allowance(msg.sender, this) >= _sellAmount, "Must have set allowance for this contract");
+        require(_sellAmount>0, "Must have set amount for conversion");
 
         uint256 amount = calculateCrossConnectorReturn(energyVirtualBalance, vetVirtualBalance, _sellAmount);
 
