@@ -187,7 +187,7 @@ contract EnergyStation is Utils, Owned, Protoed{
         require(IVIP180Token(energyToken).transfer(msg.sender, finalAmount), "Transfer energy failed");
 
         vetVirtualBalance = toUINT104(safeAdd(vetVirtualBalance, _sellAmount));
-        energyVirtualBalance = safeAdd(energyVirtualBalance, amount);
+        energyVirtualBalance = safeSub(energyVirtualBalance, amount);
 
         emit Conversion(0, msg.sender, _sellAmount, finalAmount, feeAmount);
         return amount;
