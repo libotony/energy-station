@@ -77,8 +77,8 @@ contract EnergyStation is Utils, Owned, Protoed{
         ownerOnly
     {
         uint256 energyBalance = IVIP180Token(energyToken).balanceOf(this);
-        require( energyBalance >= energyVirtualBalance, "fatal: energy balance lower than virtual balance");
-        require(address(this).balance >= vetVirtualBalance, "fatal: vet balance lower than virtual balance");
+        require( energyBalance > energyVirtualBalance, "fatal: energy balance lower than virtual balance");
+        require(address(this).balance > vetVirtualBalance, "fatal: vet balance lower than virtual balance");
 
         require(IVIP180Token(energyToken).transfer(msg.sender, safeSub(energyBalance, energyVirtualBalance)),"transfer energy failed");
         msg.sender.transfer(safeSub(address(this).balance, vetVirtualBalance));
