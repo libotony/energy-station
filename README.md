@@ -17,11 +17,11 @@ The Bancor Protocol enables automatic price determination and an autonomous liqu
 
 ```
 
-+----+          +--------------+                 +---------+
-|    | ---VET-->|              | ------VET-----> |         |
-|User|          |Energy-Station|                 |VET Token|
-|    | <--VTHO--|              | <--VET Token--- |         |
-+----+          +--------------+                 +---------+
++----+          +--------------+
+|    | ---VET-->|              |
+|User|          |Energy-Station|
+|    | <--VTHO--|              |
++----+          +--------------+
 
 ```
 
@@ -29,29 +29,28 @@ The Bancor Protocol enables automatic price determination and an autonomous liqu
 
 ```
 
-+----+          +--------------+                 +---------+
-|    | --VTHO-->|              | --VET Token---> |         |
-|User|          |Energy-Station|                 |VET Token|
-|    | <--VET---|              | <------VET----- |         |
-+----+          +--------------+                 +---------+
++----+          +--------------+
+|    | --VTHO-->|              |
+|User|          |Energy-Station|
+|    | <--VET---|              |
++----+          +--------------+
 
 ```
 
 ## Deployment
 
-1. Deploy `EnergyStation`, `VETToken`, `BancorFormula`
-2. `EnergyStation.setVETToken(VETToken address)`
-3. `EnergyStation.setFormula(BancorFormula address)`
-4. `EnergyStation.setConversionFee(conversionFee in ppm)` 
-5. Send VET to `EnergyStation`
-6. Send VTHO to `EnergyStation`
-7. Enable conversion by `EnergyStation.disableConversions(false)` 
+1. Deploy `EnergyStation`
+2. `EnergyStation.setConversionFee(conversionFee in ppm)`
+3. Send VET by `EnergyStation.fillVET()`
+4. Approve EnergyStation for VTHO token
+5. Send VTHO by `EnergyStation.fillEnergy()`
+6. Enable conversion by `EnergyStation.disableConversions(false)`
 
 The amount of VET and VTHO sent to `EnergyStation` will be the initial supply of two connector token.
 
 ## Usage
 
-1. Simulate `EnergyStation.getEnergyReturn(amount)` or `EnergyStation.getVETReturn(amount)` to get converted value and multiply by 0.99 as minimum return
+1. Simulate `EnergyStation.getEnergyReturn(amount)` or `EnergyStation.getVETReturn(amount)` to get converted value and calc minimum return as `minReturn`
 2. Convert VET to VTHO: `EnergyStation.convertForVET(minReturn)` 
 2. Convert VTHO to VET: `Energy.approve(EnergyStation, amount)` and `EnergyStation.convertForEnergy(amount,minReturn)` 
 
