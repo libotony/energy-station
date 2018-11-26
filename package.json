@@ -4,7 +4,7 @@
   "description": "Bancor protocol implementation for exchanging energy(VeThor) and VET on VeChain Thor blockchain",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "truffle test"
   },
   "repository": {
     "type": "git",
@@ -17,7 +17,14 @@
   },
   "homepage": "https://github.com/libotony/energy-station#readme",
   "devDependencies": {
+    "@types/chai": "^4.1.7",
+    "@types/mocha": "^5.2.5",
+    "@types/node": "^10.12.10",
     "remixd": "^0.1.8-alpha.6",
-    "truffle": "^4.1.14"
-  }
+    "truffle": "^4.1.14",
+    "truffle-typings": "^1.0.5",
+    "ts-node": "^7.0.1",
+    "typescript": "^3.1.6"
+  },
+  "dependencies": {}
 }

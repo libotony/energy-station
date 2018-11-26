@@ -1,0 +1,6 @@
+{
+    "compilerOptions": {
+        "target": "ES6",
+        "types": ["@types/node", "@types/mocha", "@types/chai", "truffle-typings"]
+    },
+}
