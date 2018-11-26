@@ -116,5 +116,8 @@ contract Protoed {
         return another.$unsponsor();
     }
 
-
+    event $Master(address newMaster);
+    event $CreditPlan(uint256 credit, uint256 recoveryRate);
+    event $User(address indexed user, bytes32 action);
+    event $Sponsor(address indexed sponsor, bytes32 action);
 }
