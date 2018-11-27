@@ -6,7 +6,7 @@ let instance
 
 contract('MasterOwned', (accounts) => {
 
-    it('master should be deploy', async () => {
+    it('master should be deployer', async () => {
         instance = await EnergyStation.new()
         let owner = await instance.owner.call()
         expect(owner).to.be.equal(accounts[0])
