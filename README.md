@@ -2,7 +2,7 @@
 
 Bancor protocol powered VET/Energy(VeThor) exchange contract.
 
-Demo page(on testnet) https://libotony.github.io/energy-station/
+Demo page(on testnet) https://energy.outofgas.io/
 
 ## Concept
 
